@@ -283,7 +283,71 @@ if chunk:
 
 后面每个字典会被转换成一条 Milvus 数据。
 
+## 接入rag
 
+```text
+用户问题
+  ↓
+生成问题向量
+  ↓
+Milvus 搜索相关文本
+  ↓
+拼接文本上下文
+  ↓
+发送给大模型生成答案
+```
+
+当前代码已经完成前 3 步：
+
+```python
+question_vector = model.encode(
+    [question],
+    normalize_embeddings=True
+)[0].tolist()
+
+results = client.search(
+    COLLECTION,
+    data=[question_vector],
+    limit=3,
+    output_fields=["source", "text"]
+)
+```
+
+RAG 还需要取出搜索结果：
+
+```python
+contexts = [
+    hit["entity"]["text"]
+    for hit in results[0]
+]
+context = "\n\n".join(contexts)
+```
+
+然后组成提示词：
+
+```python
+prompt = f"""
+请根据以下资料回答问题。
+
+资料：
+{context}
+
+问题：
+{question}
+"""
+```
+
+最后把 `prompt` 发送给 OpenAI、通义、DeepSeek 等大模型 API。
+
+所以：
+
+```text
+Milvus：负责找资料
+大模型：负责根据资料回答
+run_demo：负责串起整个流程
+```
+
+如果只是做本地检索，不需要接入大模型；接入大模型后才是完整 RAG。
 
 
 
